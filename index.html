@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0a10" />
+<meta name="color-scheme" content="light dark" />
+<title>AniCatalog — аниме в русской озвучке</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<style>
+  :root {
+    --bg: #0b0a10; --card: #14131a; --btn: #1d1c26; --txt: #ffffff;
+    --muted: #848895; --acc: #7c5cf0; --acc-soft: rgba(124,92,240,.16); --line: rgba(255,255,255,.10);
+    --radius: 12px; --pad: 12px;
+    --ease-out: cubic-bezier(.23,1,.32,1);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    margin: 0; background: var(--bg); color: var(--txt);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px; line-height: 1.4;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  button, a, [role="button"] { touch-action: manipulation; }
+  button, .tab, .chip, .card { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 var(--pad); }
+  .view.hidden, .hidden { display: none !important; }
+
+  .topbar { display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; }
+  .logo { font-weight: 800; font-size: 16px; letter-spacing: .2px; }
+  .logo span { color: var(--acc); }
+  .back {
+    background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 10px; min-width: 38px; min-height: 38px; font-size: 16px;
+  }
+  .back:active { transform: scale(.94); }
+
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 2px 6px; }
+  .sec-head b { font-size: 14.5px; }
+  .sec-head button { background: none; border: 0; color: var(--acc); font-size: 12.5px; font-weight: 700; padding: 4px 2px; }
+  .hero { display: flex; gap: 10px; overflow-x: auto; padding: 0 0 4px;
+    scroll-snap-type: x mandatory; scrollbar-width: none; touch-action: pan-y; }
+  .hero::-webkit-scrollbar { display: none; }
+  .hero .card { scroll-snap-align: start; flex: 0 0 148px; position: relative; }
+  .hero img { height: 202px; }
+  .badge {
+    position: absolute; top: 6px; left: 6px; font-size: 11px; font-weight: 700;
+    background: rgba(0,0,0,.62); border: 1px solid var(--line); border-radius: 8px; padding: 2px 7px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  .card { background: none; border: 0; padding: 0; text-align: left; color: var(--txt); position: relative; }
+  .card img {
+    width: 100%; height: 158px; object-fit: cover; border-radius: 10px; background: var(--card);
+    border: 1px solid var(--line);
+  }
+  .card .t { font-size: 11.5px; font-weight: 600; margin-top: 4px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .y { font-size: 10.5px; color: var(--muted); }
+  .card img { transition: transform 120ms var(--ease-out); }
+  .card:active img { transform: scale(.97); }
+  .more-btn {
+    display: block; width: 100%; margin: 10px 0 4px; min-height: 42px;
+    background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 10px; font-size: 13px; font-weight: 700;
+  }
+  .more-btn:active { transform: scale(.98); }
+  .more-btn:disabled { opacity: .5; }
+
+  .skel { border-radius: 10px; background: linear-gradient(90deg, var(--btn) 25%, var(--card) 50%, var(--btn) 75%);
+    background-size: 200% 100%; animation: sh 1.2s linear infinite; }
+  @keyframes sh { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .skel { animation: none; } * { transition-duration: 0ms !important; } }
+
+  .searchbar { display: flex; gap: 8px; padding: 6px 0 10px; }
+  .searchbar input {
+    flex: 1; background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 10px; padding: 0 12px; min-height: 44px; font-size: 16px; outline: none; min-width: 0;
+  }
+  .searchbar input:focus { border-color: var(--acc); }
+  .searchbar button {
+    background: var(--acc); color: #fff; border: 0; border-radius: 10px;
+    min-width: 52px; min-height: 44px; font-size: 15px; font-weight: 700;
+  }
+
+  .title-head { display: flex; gap: 10px; padding: 4px 0 8px; }
+  .title-head img { width: 104px; height: 148px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
+  .title-head .info { flex: 1; min-width: 0; }
+  .title-head h1 { font-size: 16px; margin: 0 0 4px; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .chips span { font-size: 11px; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 8px; }
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+  .fact { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+  .fact .k { font-size: 10.5px; color: var(--muted); }
+  .fact .v { font-size: 13px; font-weight: 700; }
+  .desc { font-size: 12.5px; opacity: .92; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .desc.open { display: block; }
+  .more { background: none; border: 0; color: var(--acc); font-size: 12px; padding: 2px 0 6px; font-weight: 700; }
+  .star-row { display: flex; gap: 8px; padding: 2px 0 8px; }
+  .star-row button {
+    flex: 1; border-radius: 10px; min-height: 42px; font-size: 13.5px; font-weight: 700;
+    background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+  }
+  .star-row button.on { background: var(--acc-soft); border-color: var(--acc); color: var(--txt); }
+  .star-row button:active { transform: scale(.97); }
+
+  .tabs { display: flex; gap: 6px; padding: 0 0 8px; }
+  .tabs button {
+    flex: 1; background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 6px; font-size: 13px; font-weight: 600; min-height: 40px;
+    transition: transform 120ms var(--ease-out), background 120ms;
+  }
+  .tabs button.active { background: var(--acc); border-color: var(--acc); }
+  .tabs button:active, #eps button:active, .pager button:active { transform: scale(.95); }
+  @media (hover: hover) and (pointer: fine) {
+    .tabs button:hover, #eps button:hover, .pager button:hover, .more-btn:hover { filter: brightness(1.15); }
+  }
+  .player { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 2px; }
+  video { width: 100%; aspect-ratio: 16/9; max-height: 34dvh; background: #000; border-radius: var(--radius); }
+  .eps-head { display: flex; align-items: baseline; justify-content: space-between; padding: 8px 2px 4px; }
+  .eps-head b { font-size: 12.5px; }
+  .eps-head span { font-size: 11.5px; color: var(--muted); }
+  .pager { display: flex; align-items: center; gap: 6px; padding: 0 0 6px; }
+  .pager button {
+    background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 8px; min-height: 34px; min-width: 34px; padding: 4px 10px; font-size: 13px;
+  }
+  .pager .page-label { flex: 1; text-align: center; font-size: 12px; color: var(--muted); }
+  #eps { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 6px; max-height: 28dvh; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 8px; }
+  #eps button {
+    background: var(--btn); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 8px; min-height: 40px; font-size: 13px; font-weight: 600; padding: 4px;
+  }
+  #eps button.active { background: var(--acc); border-color: var(--acc); }
+  #seasons { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; scrollbar-width: none; touch-action: pan-y; }
+  #seasons::-webkit-scrollbar { display: none; }
+  #seasons button {
+    flex: 0 0 auto; max-width: 62vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    background: var(--card); color: #cfcfff; border: 1px solid var(--line);
+    border-radius: 999px; padding: 6px 10px; font-size: 11.5px;
+  }
+  .row { padding: 2px 2px 8px; font-size: 12.5px; color: var(--muted); }
+  .open-btn {
+    display: block; width: 100%; text-align: center; text-decoration: none;
+    background: var(--acc); color: #fff; border-radius: var(--radius);
+    padding: 11px; font-weight: 700; font-size: 14px; margin: 2px 0 8px; min-height: 44px;
+  }
+  iframe.go { width: 100%; height: 62dvh; border: 0; border-radius: var(--radius); background: #fff; }
+  .warn { padding: 16px 4px; color: var(--muted); font-size: 13px; }
+
+  .navbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .navbar .in { max-width: 720px; margin: 0 auto; display: flex; }
+  .navbar button {
+    flex: 1; background: none; border: 0; color: var(--muted);
+    font-size: 11.5px; font-weight: 600; padding: 10px 0 8px;
+  }
+  .navbar button.active { color: var(--txt); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ГЛАВНАЯ -->
+  <div class="view" id="view-home">
+    <div class="topbar"><div class="logo">Ani<span>Catalog</span></div></div>
+    <div class="sec-head"><b>Сейчас смотрят</b></div>
+    <div class="hero" id="hero"><div class="skel" style="flex:0 0 148px;height:238px"></div><div class="skel" style="flex:0 0 148px;height:238px"></div><div class="skel" style="flex:0 0 148px;height:238px"></div></div>
+    <div class="sec-head"><b>Новинки 2026</b><button data-list="new2026">Все</button></div>
+    <div class="grid" id="grid-new"></div>
+    <div class="sec-head"><b>Онгоинги</b><button data-list="ongoing">Все</button></div>
+    <div class="grid" id="grid-ongoing"></div>
+    <div class="sec-head"><b>Топ по рейтингу</b><button data-list="top">Все</button></div>
+    <div class="grid" id="grid-top"></div>
+    <div class="sec-head"><b>Соединение</b></div>
+    <div class="row">Не грузятся картинки или серии? Нажми проверку и пришли результат.</div>
+    <button class="more-btn" id="diagBtn">Проверить соединение</button>
+    <div class="row" id="diagOut"></div>
+  </div>
+
+  <!-- СПИСОК -->
+  <div class="view hidden" id="view-list">
+    <div class="topbar"><button class="back" data-back aria-label="Назад">‹</button><div class="logo" id="list-title">Список</div></div>
+    <div class="grid" id="grid-list"></div>
+    <button class="more-btn" id="list-more">Показать еще</button>
+  </div>
+
+  <!-- ПОИСК -->
+  <div class="view hidden" id="view-search">
+    <div class="topbar"><div class="logo">Поиск</div></div>
+    <div class="searchbar">
+      <input id="q" placeholder="Название аниме…" enterkeyhint="search" autocomplete="off" />
+      <button id="qGo" aria-label="Найти">Найти</button>
+    </div>
+    <div class="grid" id="grid-search"></div>
+    <div class="warn hidden" id="searchHint">Введи название — ищет по каталогу Anilibria.</div>
+  </div>
+
+  <!-- ТАЙТЛ -->
+  <div class="view hidden" id="view-title">
+    <div class="topbar"><button class="back" id="backBtn" aria-label="Назад">‹</button><div class="logo" id="t-crumb">Тайтл</div></div>
+    <div class="title-head">
+      <img id="t-poster" alt="" loading="lazy" />
+      <div class="info">
+        <h1 id="t-name">…</h1>
+        <div class="chips" id="t-chips"></div>
+      </div>
+    </div>
+    <div class="facts" id="t-facts"></div>
+    <div class="desc" id="t-desc"></div>
+    <button class="more hidden" id="t-more">Показать полностью</button>
+    <div class="star-row"><button id="t-fav">В избранное</button></div>
+    <div class="sub" id="count" style="font-size:12px;color:var(--muted);padding:2px 0 6px"></div>
+    <div id="seasons"></div>
+    <div class="tabs" role="tablist">
+      <button id="tabA" class="active" role="tab">Anilibria</button>
+      <button id="tabG" role="tab">Все серии</button>
+    </div>
+    <div id="paneA">
+      <div class="player"><video id="v" controls playsinline preload="metadata"></video></div>
+      <div class="eps-head"><b>Серии</b><span id="epsInfo"></span></div>
+      <div class="pager hidden" id="pager">
+        <button id="pgPrev" aria-label="Назад">‹</button>
+        <div class="page-label" id="pgLabel"></div>
+        <button id="pgNext" aria-label="Вперед">›</button>
+      </div>
+      <div id="eps"></div>
+    </div>
+    <div id="paneG" class="hidden">
+      <div class="row" id="goLink"></div>
+      <a class="open-btn" id="goOpen" href="#" target="_blank" rel="noopener">Открыть плеер AnimeGO</a>
+      <div id="goFrame"></div>
+    </div>
+  </div>
+
+  <!-- ИЗБРАННОЕ -->
+  <div class="view hidden" id="view-favs">
+    <div class="topbar"><div class="logo">Избранное</div></div>
+    <div class="grid" id="grid-favs"></div>
+    <div class="warn hidden" id="favsEmpty">Пока пусто. Открой тайтл и нажми «В избранное».</div>
+  </div>
+</div>
+
+<nav class="navbar"><div class="in">
+  <button data-nav="home" class="active">Главная</button>
+  <button data-nav="search">Поиск</button>
+  <button data-nav="favs">Моё</button>
+</div></nav>
+
+<script>
+  const API = "https://anilibria.top/api/v1";
+  const SHIKI = "https://shikimori.one/api";
+  const PAGE = 24, GRID_N = 12, LIST_N = 18;
+  const q0 = new URLSearchParams(location.search);
+
+  const tg = window.Telegram && Telegram.WebApp ? Telegram.WebApp : null;
+  if (tg) {
+    tg.expand();
+    try {
+      const th = tg.themeParams || {};
+      const root = document.documentElement.style;
+      if (th.bg_color) root.setProperty("--bg", th.bg_color);
+      if (th.text_color) root.setProperty("--txt", th.text_color);
+      if (th.hint_color) root.setProperty("--muted", th.hint_color);
+      if (th.button_color) root.setProperty("--acc", th.button_color);
+    } catch (e) {}
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const posterOf = (r, kind) => {
+    const p = r.poster || {};
+    const o = p.optimized || {};
+    const src = kind === "big" ? (o.src || p.src) : (o.preview || o.thumbnail || p.preview || p.thumbnail || p.src);
+    return src ? "https://anilibria.top" + src : "";
+  };
+  const titleOf = (r) => (r.name && (r.name.main || r.name.english)) || "Без названия";
+
+  // --- навигация ---
+  const views = { home: $("view-home"), list: $("view-list"), search: $("view-search"), title: $("view-title"), favs: $("view-favs") };
+  let lastList = "home";
+  function nav(name) {
+    for (const k of Object.keys(views)) views[k].classList.toggle("hidden", k !== name);
+    document.querySelectorAll("[data-nav]").forEach(b => b.classList.toggle("active", b.dataset.nav === name));
+    if (name !== "title") lastList = name;
+    window.scrollTo({ top: 0 });
+    if (name === "favs") renderFavs();
+  }
+  document.querySelectorAll("[data-nav]").forEach(b => b.onclick = () => nav(b.dataset.nav));
+  document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => nav(lastList === "list" ? "home" : lastList));
+  $("backBtn").onclick = () => nav(lastList);
+
+  function cardEl(r, hero) {
+    const b = document.createElement("button");
+    b.className = "card";
+    const img = document.createElement("img");
+    img.loading = "lazy"; img.alt = titleOf(r); img.src = posterOf(r);
+    b.appendChild(img);
+    const sh = r.shikimori || {};
+    if (hero && sh.rating) {
+      const badge = document.createElement("span");
+      badge.className = "badge"; badge.textContent = "★ " + sh.rating;
+      b.appendChild(badge);
+    }
+    const t = document.createElement("div"); t.className = "t"; t.textContent = titleOf(r);
+    const y = document.createElement("div"); y.className = "y";
+    y.textContent = [r.year, r.is_ongoing ? "онгоинг" : ""].filter(Boolean).join(" • ");
+    b.append(t, y);
+    b.onclick = () => openTitle(r.id);
+    return b;
+  }
+  function fillGrid(el, items, hero) {
+    el.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    items.forEach(r => frag.appendChild(cardEl(r, hero)));
+    el.appendChild(frag);
+  }
+
+  async function getJSON(url, opts) {
+    const r = await fetch(url, opts);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }
+
+  // --- главная: 4 витрины параллельно ---
+  async function loadHome() {
+    const settled = await Promise.allSettled([
+      getJSON(`${API}/anime/releases/latest?limit=8`).then(j => j.data || j),
+      getJSON(`${API}/anime/catalog/releases?f[years][from_year]=2026&f[years][to_year]=2026&f[publish_statuses]=IS_ONGOING&f[sorting]=RATING_DESC&page=1&limit=${GRID_N}`).then(j => j.data || []),
+      getJSON(`${API}/anime/catalog/releases?f[publish_statuses]=IS_ONGOING&f[sorting]=RATING_DESC&page=1&limit=${GRID_N}`).then(j => j.data || []),
+      getJSON(`${API}/anime/catalog/releases?f[sorting]=RATING_DESC&page=1&limit=${GRID_N}`).then(j => j.data || []),
+    ]);
+    const [latest, n2026, ongo, top] = settled.map(s => s.status === "fulfilled" ? s.value : []);
+    if (!latest.length && !n2026.length && !ongo.length && !top.length) {
+      $("hero").innerHTML = '<div class="warn">Не загрузилось. Проверь интернет и открой заново.</div>';
+      return;
+    }
+    const hero = $("hero"); hero.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    latest.slice(0, 8).forEach(r => frag.appendChild(cardEl(r, true)));
+    hero.appendChild(frag);
+    fillGrid($("grid-new"), n2026);
+    fillGrid($("grid-ongoing"), ongo);
+    fillGrid($("grid-top"), top);
+  }
+
+  // --- диагностика соединения (видно прямо на экране) ---
+  async function runDiag() {
+    const out = $("diagOut");
+    const lines = [];
+    const line = (s) => { lines.push(s); out.innerHTML = lines.map(l => `<div>${l}</div>`).join(""); };
+    out.innerHTML = "<div>Проверяю…</div>";
+    try {
+      const t0 = Date.now();
+      const j = await getJSON(`${API}/anime/releases/latest?limit=1`);
+      const one = (j.data || j)[0] || j;
+      line(`API: OK за ${Date.now() - t0} мс`);
+      const p = one.poster || {};
+      const psrc = "https://anilibria.top" + ((p.optimized || {}).preview || p.src || "");
+      await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = res; im.onerror = () => rej(new Error("img error"));
+        setTimeout(() => rej(new Error("img timeout 15s")), 15000);
+        im.src = psrc;
+      });
+      line("Картинки: OK");
+    } catch (e) {
+      line("ОШИБКА: " + (e && e.message || e));
+      line("API или картинки недоступны с этого устройства/сети.");
+    }
+    try {
+      await getJSON(`${SHIKI}/animes/1`, { headers: { "User-Agent": "anime-telegram-bot/1.0" } });
+      line("Shikimori (сезоны): OK");
+    } catch (e) {
+      line("Shikimori (сезоны): недоступен — сезоны скрыты, остальное работает.");
+    }
+  }
+  $("diagBtn").onclick = runDiag;
+
+  // --- полные списки с пагинацией ---
+  const LISTS = {
+    new2026: {
+      title: "Новинки 2026",
+      url: (p) => `${API}/anime/catalog/releases?f[years][from_year]=2026&f[years][to_year]=2026&f[publish_statuses]=IS_ONGOING&f[sorting]=RATING_DESC&page=${p}&limit=${LIST_N}`,
+    },
+    ongoing: {
+      title: "Онгоинги",
+      url: (p) => `${API}/anime/catalog/releases?f[publish_statuses]=IS_ONGOING&f[sorting]=RATING_DESC&page=${p}&limit=${LIST_N}`,
+    },
+    top: {
+      title: "Топ по рейтингу",
+      url: (p) => `${API}/anime/catalog/releases?f[sorting]=RATING_DESC&page=${p}&limit=${LIST_N}`,
+    },
+  };
+  let listKey = null, listPage = 1, listBusy = false;
+  async function openList(key) {
+    listKey = key; listPage = 1;
+    $("list-title").textContent = LISTS[key].title;
+    $("grid-list").innerHTML = '<div class="skel" style="height:190px"></div>'.repeat(6);
+    $("list-more").disabled = false;
+    nav("list");
+    await loadListPage(true);
+  }
+  async function loadListPage(reset) {
+    if (listBusy) return;
+    listBusy = true;
+    const btn = $("list-more");
+    btn.disabled = true; btn.textContent = "Загрузка…";
+    try {
+      const j = await getJSON(LISTS[listKey].url(listPage));
+      const items = j.data || [];
+      const grid = $("grid-list");
+      if (reset) grid.innerHTML = "";
+      if (!items.length && reset) grid.innerHTML = '<div class="warn">Список пуст.</div>';
+      const frag = document.createDocumentFragment();
+      items.forEach(r => frag.appendChild(cardEl(r)));
+      grid.appendChild(frag);
+      listPage += 1;
+      btn.disabled = items.length < LIST_N;
+      btn.textContent = items.length < LIST_N ? "Это все" : "Показать еще";
+    } catch (e) {
+      if (reset) $("grid-list").innerHTML = '<div class="warn">Ошибка загрузки.</div>';
+      btn.disabled = false; btn.textContent = "Повторить";
+      listPage = Math.max(1, listPage - 0);
+    } finally { listBusy = false; }
+  }
+  document.querySelectorAll("[data-list]").forEach(b => b.onclick = () => openList(b.dataset.list));
+  $("list-more").onclick = () => loadListPage(false);
+
+  // --- поиск ---
+  let searchTimer = null;
+  async function doSearch(query) {
+    const grid = $("grid-search"), hint = $("searchHint");
+    query = (query || "").trim();
+    if (query.length < 2) { grid.innerHTML = ""; hint.classList.remove("hidden"); return; }
+    hint.classList.add("hidden");
+    grid.innerHTML = '<div class="skel" style="height:190px"></div>'.repeat(6);
+    try {
+      const j = await getJSON(`${API}/anime/catalog/releases?f[search]=${encodeURIComponent(query)}&page=1&limit=12`);
+      const items = j.data || [];
+      if (!items.length) { grid.innerHTML = '<div class="warn">Ничего не найдено.</div>'; return; }
+      fillGrid(grid, items);
+    } catch (e) {
+      grid.innerHTML = '<div class="warn">Ошибка поиска.</div>';
+    }
+  }
+  $("q").addEventListener("input", (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => doSearch(e.target.value), 400);
+  });
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(e.target.value); });
+  $("qGo").onclick = () => doSearch($("q").value);
+
+  // --- избранное (CloudStorage в TG, иначе localStorage) ---
+  const store = {
+    async get(k) {
+      try {
+        if (tg && tg.CloudStorage) return new Promise(res => tg.CloudStorage.getItem(k, (e, v) => res(e ? null : v)));
+        return localStorage.getItem("webapp:" + k);
+      } catch (e) { return null; }
+    },
+    async set(k, v) {
+      try {
+        if (tg && tg.CloudStorage) return new Promise(res => tg.CloudStorage.setItem(k, v, () => res()));
+        localStorage.setItem("webapp:" + k, v);
+      } catch (e) {}
+    },
+    async del(k) {
+      try {
+        if (tg && tg.CloudStorage) return new Promise(res => tg.CloudStorage.removeItem(k, () => res()));
+        localStorage.removeItem("webapp:" + k);
+      } catch (e) {}
+    },
+    async keys() {
+      try {
+        if (tg && tg.CloudStorage) return new Promise(res => tg.CloudStorage.getKeys((e, v) => res(e ? [] : v)));
+        return Object.keys(localStorage).filter(k => k.startsWith("webapp:fav:")).map(k => k.replace("webapp:", ""));
+      } catch (e) { return []; }
+    },
+  };
+  const favKey = (id) => "fav:" + id;
+  async function isFav(id) { return !!(await store.get(favKey(id))); }
+  async function renderFavs() {
+    const grid = $("grid-favs");
+    const keys = (await store.keys()).filter(k => k.startsWith("fav:"));
+    $("favsEmpty").classList.toggle("hidden", keys.length > 0);
+    grid.innerHTML = "";
+    for (const k of keys.slice(0, 60)) {
+      const raw = await store.get(k);
+      try { grid.appendChild(cardEl(JSON.parse(raw))); } catch (e) {}
+    }
+  }
+
+  // --- тайтл ---
+  const video = $("v"), box = $("eps");
+  let releaseId = null, epsList = [], curIdx = 0, page = 0, hls = null, curRelease = null, animego = "";
+  function playUrl(url) {
+    if (!url) return;
+    if (Hls.isSupported()) {
+      if (hls) hls.destroy();
+      hls = new Hls({ maxBufferLength: 30 });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = url; video.play().catch(() => {});
+    } else { video.src = url; }
+  }
+  function playIdx(i) {
+    if (i < 0 || i >= epsList.length) return;
+    curIdx = i; page = Math.floor(i / PAGE); renderPage();
+    const ep = epsList[i];
+    $("epsInfo").textContent = `Серия ${ep.ordinal} / ${epsList.length}`;
+    playUrl(ep.hls_1080 || ep.hls_720 || ep.hls_480);
+    if (tg && tg.HapticFeedback) { try { tg.HapticFeedback.selectionChanged(); } catch (e) {} }
+  }
+  function renderPage() {
+    const pages = Math.max(1, Math.ceil(epsList.length / PAGE));
+    page = Math.min(Math.max(0, page), pages - 1);
+    const start = page * PAGE;
+    box.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    epsList.slice(start, start + PAGE).forEach((ep) => {
+      const gi = epsList.indexOf(ep);
+      const b = document.createElement("button");
+      b.textContent = ep.ordinal;
+      if (gi === curIdx) b.classList.add("active");
+      b.onclick = () => playIdx(gi);
+      frag.appendChild(b);
+    });
+    box.appendChild(frag);
+    const pager = $("pager");
+    if (epsList.length > PAGE) {
+      pager.classList.remove("hidden");
+      $("pgLabel").textContent = `${start + 1}–${Math.min(start + PAGE, epsList.length)} из ${epsList.length}`;
+    } else pager.classList.add("hidden");
+  }
+  $("pgPrev").onclick = () => { const n = Math.ceil(epsList.length / PAGE); page = (page - 1 + n) % n; renderPage(); };
+  $("pgNext").onclick = () => { const n = Math.ceil(epsList.length / PAGE); page = (page + 1) % n; renderPage(); };
+  video.addEventListener("ended", () => { if (curIdx + 1 < epsList.length) playIdx(curIdx + 1); });
+
+  function showTab(which) {
+    const a = which === "A";
+    $("tabA").classList.toggle("active", a); $("tabG").classList.toggle("active", !a);
+    $("paneA").classList.toggle("hidden", !a); $("paneG").classList.toggle("hidden", a);
+    if (!a && !$("goFrame").firstChild) loadGo();
+  }
+  $("tabA").onclick = () => showTab("A"); $("tabG").onclick = () => showTab("G");
+
+  async function loadGo() {
+    const linkBox = $("goLink"), frameBox = $("goFrame"), openBtn = $("goOpen");
+    // ищем страницу AnimeGO лениво — только когда вкладку открыли
+    if (!animego || !/^https:\/\//.test(animego)) {
+      linkBox.textContent = "Ищу плеер с другими озвучками…";
+      try {
+        const html = await fetch("https://animego.me/search/all?q=" + encodeURIComponent(title),
+          { headers: { "User-Agent": "Mozilla/5.0" } }).then(r => r.text());
+        const m = html.match(/href="(\/anime\/[a-z0-9\-]+)"[^>]*>\s*<img[^>]+alt="([^"]+)"/i);
+        if (m) animego = "https://animego.me" + m[1];
+      } catch (err) {}
+    }
+    if (animego && /^https:\/\//.test(animego)) {
+      openBtn.href = animego;
+      linkBox.textContent = "Другие озвучки — плеер AnimeGO ниже. Если не грузится, открой кнопкой.";
+      frameBox.innerHTML = "";
+      const f = document.createElement("iframe");
+      f.className = "go"; f.src = animego; f.loading = "lazy";
+      f.setAttribute("allowfullscreen", "");
+      f.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture");
+      frameBox.appendChild(f);
+    } else {
+      // запасной вариант: поисковая выдача AnimeGO
+      const su = "https://animego.me/search/all?q=" + encodeURIComponent(title);
+      openBtn.href = su;
+      linkBox.textContent = "Точную страницу не нашел — откроется поиск AnimeGO.";
+    }
+  }
+
+  function factRow(k, v) {
+    const d = document.createElement("div"); d.className = "fact";
+    const kk = document.createElement("div"); kk.className = "k"; kk.textContent = k;
+    const vv = document.createElement("div"); vv.className = "v"; vv.textContent = v;
+    d.append(kk, vv);
+    return d;
+  }
+
+  async function openTitle(id) {
+    nav("title");
+    showTab("A");
+    box.innerHTML = '<div class="warn">Загрузка серий…</div>';
+    $("epsInfo").textContent = ""; $("seasons").innerHTML = ""; $("goFrame").innerHTML = "";
+    $("t-desc").textContent = ""; $("t-chips").innerHTML = ""; $("t-facts").innerHTML = "";
+    releaseId = id; curIdx = 0; page = 0; animego = q0.get("animego") || "";
+    let mRes, eRes, gRes;
+    try {
+      [mRes, eRes, gRes] = await Promise.all([
+        getJSON(`${API}/anime/releases/${id}`),
+        getJSON(`${API}/anime/releases/${id}?include=episodes`),
+        getJSON(`${API}/anime/releases/${id}?include=genres`).catch(() => ({})),
+      ]);
+    } catch (e) {
+      box.innerHTML = '<div class="warn">Не загрузилось: ' + (e && e.message || e) + '. Проверь интернет и открой заново.</div>';
+      return;
+    }
+    const meta = mRes.data || mRes;
+    curRelease = meta;
+    const t = titleOf(curRelease);
+    title = t;
+    document.title = t + " — AniCatalog";
+    $("t-crumb").textContent = t.length > 26 ? t.slice(0, 26) + "…" : t;
+    $("t-name").textContent = t;
+    const big = posterOf(curRelease, "big");
+    if (big) { $("t-poster").src = big; $("t-poster").alt = t; }
+    const chips = [];
+    if (curRelease.year) chips.push(curRelease.year);
+    if (curRelease.type) chips.push(curRelease.type.description || curRelease.type.value);
+    const sh = curRelease.shikimori || {};
+    if (sh.rating) chips.push("★ " + sh.rating);
+    const genres = (gRes.genres || []).slice(0, 4).map(g => g.name).filter(Boolean);
+    $("t-chips").innerHTML = "";
+    chips.concat(genres).filter(Boolean).forEach(c => {
+      const s = document.createElement("span"); s.textContent = c; $("t-chips").appendChild(s);
+    });
+    // актуальные факты: год, сезон, тип, статус, всего серий, в озвучке
+    const season = curRelease.season && curRelease.season.description
+      ? curRelease.season.description + (curRelease.year ? " " + curRelease.year : "")
+      : (curRelease.year || "—");
+    epsList = ((eRes.episodes) || []).slice().sort((a, b) => a.ordinal - b.ordinal);
+    const tot = curRelease.episodes_total || 0;
+    const facts = $("t-facts");
+    facts.append(
+      factRow("Год", String(curRelease.year || "—")),
+      factRow("Сезон", season),
+      factRow("Тип", (curRelease.type && (curRelease.type.description || curRelease.type.value)) || "—"),
+      factRow("Статус", curRelease.is_ongoing ? "Онгоинг" : "Завершено"),
+      factRow("Всего серий", tot ? String(tot) : "—"),
+      factRow("В озвучке", epsList.length ? String(epsList.length) : "—"),
+    );
+    $("count").textContent = epsList.length && tot && epsList.length < tot
+      ? `В озвучке Anilibria: ${epsList.length} из ${tot}. Остальные — во вкладке «Все серии».`
+      : "";
+    const desc = curRelease.description || "";
+    $("t-desc").textContent = desc;
+    const more = $("t-more");
+    if (desc.length > 220) {
+      more.classList.remove("hidden");
+      more.onclick = () => { $("t-desc").classList.toggle("open"); more.textContent = $("t-desc").classList.contains("open") ? "Свернуть" : "Показать полностью"; };
+    } else more.classList.add("hidden");
+    const favBtn = $("t-fav");
+    favBtn.textContent = "В избранное";
+    favBtn.classList.remove("on");
+    // проверку избранного не ждем: она не должна блокировать серии
+    isFav(id).then(fav => {
+      favBtn.textContent = fav ? "В избранном" : "В избранное";
+      favBtn.classList.toggle("on", !!fav);
+    }).catch(() => {});
+    favBtn.onclick = async () => {
+      if (await isFav(id)) {
+        await store.del(favKey(id));
+        favBtn.textContent = "В избранное"; favBtn.classList.remove("on");
+      } else {
+        await store.set(favKey(id), JSON.stringify({ id: curRelease.id, name: curRelease.name, poster: curRelease.poster, year: curRelease.year, is_ongoing: curRelease.is_ongoing }));
+        favBtn.textContent = "В избранном"; favBtn.classList.add("on");
+      }
+    };
+    if (!epsList.length) {
+      box.innerHTML = '<div class="warn">Серий в Anilibria пока нет — открой вкладку «Все серии».</div>';
+    } else { renderPage(); playIdx(0); }
+    loadSeasons(sh.id);
+  }
+
+  async function loadSeasons(shikimoriId) {
+    if (!shikimoriId) return;
+    try {
+      const rel = await getJSON(`${SHIKI}/animes/${shikimoriId}/related`, { headers: { "User-Agent": "anime-telegram-bot/1.0" } });
+      const sbox = $("seasons");
+      const items = (rel || []).filter(x => x.anime).slice(0, 12);
+      for (const it of items) {
+        const a = it.anime;
+        const name = a.russian || a.name;
+        const b = document.createElement("button");
+        b.textContent = `${it.relation_ru || it.relation}: ${name}`;
+        b.onclick = async () => {
+          b.disabled = true;
+          try {
+            const s = await getJSON(`${API}/anime/catalog/releases?f[search]=${encodeURIComponent(name)}&page=1&limit=1`);
+            const found = (s.data || [])[0];
+            if (found) { animego = ""; await openTitle(found.id); }
+          } finally { b.disabled = false; }
+        };
+        sbox.appendChild(b);
+      }
+    } catch (e) {}
+  }
+
+  // --- старт: диплинк из бота открывает сразу тайтл ---
+  (async () => {
+    const rid = q0.get("release_id");
+    if (q0.get("animego")) animego = q0.get("animego");
+    if (rid) {
+      try { await openTitle(rid); return; } catch (e) {}
+    }
+    nav("home");
+    loadHome();
+  })();
+</script>
+</body>
+</html>
